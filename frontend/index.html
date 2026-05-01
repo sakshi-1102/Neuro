@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroVoice — BCI Communication System</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="logo">NeuroVoice <span class="logo-tag">BCI</span></div>
+    <nav>
+      <a href="#" class="nav-item active" onclick="showPage('dashboard')">📊 Dashboard</a>
+      <a href="#" class="nav-item" onclick="showPage('patients')">👥 Patients</a>
+      <a href="#" class="nav-item" onclick="showPage('patient-view')">🧠 Patient View</a>
+      <a href="#" class="nav-item" onclick="showPage('analytics')">📈 Analytics</a>
+      <a href="#" class="nav-item" onclick="showPage('about')">ℹ️ About</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="doc-info">
+        <div class="doc-avatar">DR</div>
+        <div>
+          <div class="doc-name">Dr. Sharma</div>
+          <div class="doc-role">Neurologist</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Pages ── -->
+  <main class="main">
+
+    <!-- ══ PAGE: DASHBOARD ══ -->
+    <div id="page-dashboard" class="page active">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Live Decoding Dashboard</h1>
+          <p class="page-sub">
+            <span id="status-dot" class="live-dot" style="background:#94a3b8"></span>
+            <span id="status-text">No session active</span> — Patient:
+            <strong id="current-patient">Select a patient</strong>
+          </p>
+        </div>
+        <div class="header-actions">
+          <select id="patient-select" onchange="switchPatient(this.value)">
+            <option value="1">Ramesh Kumar — ALS</option>
+            <option value="2">Sunita Patil — Locked-in</option>
+            <option value="3">Arjun Nair — Stroke</option>
+          </select>
+          <button class="btn-primary" id="session-btn" onclick="startSession()">
+            Start Session
+          </button>
+          <button id="stop-btn" onclick="stopSession()"
+                  style="display:none;padding:11px 20px;background:#ef4444;
+                         color:white;border:none;border-radius:8px;
+                         font-size:14px;cursor:pointer;font-weight:500">
+            ⏹ Stop Session
+          </button>
+        </div>
+      </header>
+
+      <!-- Alert Banner -->
+      <div id="alert-banner" class="alert-banner" style="display:none">
+        🚨 EMERGENCY: Patient requesting urgent help! Notify medical staff immediately.
+        <button onclick="dismissAlert()">Dismiss</button>
+      </div>
+
+      <!-- Metrics -->
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="metric-label">Decoded Today</div>
+          <div class="metric-val" id="total-decoded">0</div>
+          <div class="metric-sub">messages</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Avg Confidence</div>
+          <div class="metric-val" id="avg-conf">—</div>
+          <div class="metric-sub">model score</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Most Frequent</div>
+          <div class="metric-val" id="most-freq">—</div>
+          <div class="metric-sub">word today</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Session Time</div>
+          <div class="metric-val" id="session-time">00:00</div>
+          <div class="metric-sub">active</div>
+        </div>
+      </div>
+
+      <!-- Main Panels -->
+      <div class="panels">
+
+        <!-- Upload + Controls -->
+        <div class="panel">
+          <h2 class="panel-title">EEG Signal Input</h2>
+          <div class="upload-area" id="upload-area"
+               onclick="document.getElementById('eeg-file').click()">
+            <div class="upload-icon">⚡</div>
+            <p id="upload-label">Click to upload EEG file</p>
+            <p class="upload-sub">.npy &nbsp;.csv &nbsp;.edf supported</p>
+          </div>
+          <input type="file" id="eeg-file" accept=".npy,.csv,.edf"
+                 style="display:none" onchange="handleFile(this)">
+          <button class="btn-primary full-width" style="margin-top:12px"
+                  onclick="decodeSignal()">
+            ⚡ Decode Signal
+          </button>
+          <button id="sim-btn" class="btn-simulator full-width"
+                  style="margin-top:8px" onclick="startLiveSimulator()">
+            ▶ Start Live Simulator
+          </button>
+          <div class="eeg-section">
+            <div class="eeg-label">Live EEG Channels</div>
+            <canvas id="eeg-canvas" width="340" height="80"></canvas>
+          </div>
+          <div class="signal-quality">
+            <span>Signal Quality</span>
+            <div class="sq-bar">
+              <div class="sq-fill" id="sq-fill" style="width:80%"></div>
+            </div>
+            <span id="sq-text" class="sq-good">Good</span>
+          </div>
+        </div>
+
+        <!-- Decoded Output -->
+        <div class="panel">
+          <h2 class="panel-title">Decoded Message</h2>
+          <div class="decoded-word" id="decoded-word">—</div>
+          <div class="conf-row">
+            <span>Confidence</span>
+            <span id="conf-pct">—</span>
+          </div>
+          <div class="conf-bar-bg">
+            <div class="conf-bar-fill" id="conf-bar"></div>
+          </div>
+          <div id="threshold-warn" class="threshold-warn" style="display:none">
+            ⚠️ Low confidence — result may be inaccurate. Please retry.
+          </div>
+          <div class="word-grid" id="word-grid"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+            <button class="btn-speak" onclick="speakWord()">🔊 English</button>
+            <button class="btn-speak btn-hindi" onclick="speakHindi()">🔊 हिंदी</button>
+          </div>
+          <button class="btn-speak" style="margin-top:8px;background:#fef3c7;
+                  color:#92400e;border-color:#fcd34d" onclick="speakMarathi()">
+            🔊 मराठी (Marathi)
+          </button>
+        </div>
+
+        <!-- Probability Chart -->
+        <div class="panel">
+          <h2 class="panel-title">Word Probabilities</h2>
+          <div id="prob-chart">
+            <p class="empty-msg">Decode a signal to see probabilities.</p>
+          </div>
+          <div style="margin-top:16px">
+            <div class="panel-title" style="font-size:12px;margin-bottom:8px">
+              Recent word timeline
+            </div>
+            <div id="word-timeline" class="word-timeline">
+              <span class="empty-msg" style="font-size:12px">No words yet</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Session History -->
+        <div class="panel">
+          <h2 class="panel-title">Session History</h2>
+          <div class="patient-mini-card" id="patient-card">
+            <div class="pat-avatar-sm" id="pat-initials">RK</div>
+            <div>
+              <div id="pat-name-display" style="font-weight:600;font-size:13px">
+                Ramesh Kumar
+              </div>
+              <div id="pat-condition" style="font-size:11px;color:#64748b">
+                ALS — ICU Ward 3
+              </div>
+            </div>
+            <div class="pat-status-badge">Active</div>
+          </div>
+          <div id="history-list" class="history-list" style="margin-top:12px">
+            <p class="empty-msg">No messages yet this session.</p>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+            <button class="btn-secondary" onclick="downloadHistory()">
+              📥 Download CSV
+            </button>
+            <button class="btn-secondary" onclick="clearHistory()">
+              🗑️ Clear
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ PAGE: PATIENTS ══ -->
+    <div id="page-patients" class="page">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Patient Management</h1>
+          <p class="page-sub">Add and manage patients in the system</p>
+        </div>
+        <button class="btn-primary" onclick="showAddPatient()">+ Add New Patient</button>
+      </header>
+      <div class="panel" id="add-patient-form" style="display:none;margin-bottom:18px">
+        <h2 class="panel-title">Add New Patient</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="p-name">Full Name</label>
+            <input type="text" id="p-name" placeholder="e.g. Ramesh Kumar">
+          </div>
+          <div class="form-group">
+            <label for="p-age">Age</label>
+            <input type="number" id="p-age" placeholder="e.g. 45">
+          </div>
+          <div class="form-group">
+            <label for="p-condition">Condition</label>
+            <select id="p-condition">
+              <option>ALS</option>
+              <option>Locked-in Syndrome</option>
+              <option>Stroke</option>
+              <option>Spinal Cord Injury</option>
+              <option>Cerebral Palsy</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="p-ward">Ward</label>
+            <input type="text" id="p-ward" placeholder="e.g. ICU Ward 3">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn-primary" onclick="addPatient()">Save Patient</button>
+          <button class="btn-secondary"
+                  onclick="document.getElementById('add-patient-form').style.display='none'">
+            Cancel
+          </button>
+        </div>
+      </div>
+      <div id="patient-cards" class="patient-cards-grid">
+        <div class="patient-card-full">
+          <div class="pat-avatar-lg">RK</div>
+          <div class="pat-details">
+            <div class="pat-name-lg">Ramesh Kumar</div>
+            <div class="pat-info">Age: 45 | ALS | ICU Ward 3</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn-primary" onclick="switchPatient(1);showPage('dashboard')">Open Dashboard</button>
+            <button class="btn-secondary" onclick="switchPatient(1);showPage('patient-view')">Patient View</button>
+          </div>
+        </div>
+        <div class="patient-card-full">
+          <div class="pat-avatar-lg" style="background:#f0fdf4;color:#15803d">SP</div>
+          <div class="pat-details">
+            <div class="pat-name-lg">Sunita Patil</div>
+            <div class="pat-info">Age: 38 | Locked-in Syndrome | Neuro Ward 1</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn-primary" onclick="switchPatient(2);showPage('dashboard')">Open Dashboard</button>
+            <button class="btn-secondary" onclick="switchPatient(2);showPage('patient-view')">Patient View</button>
+          </div>
+        </div>
+        <div class="patient-card-full">
+          <div class="pat-avatar-lg" style="background:#fef3c7;color:#92400e">AN</div>
+          <div class="pat-details">
+            <div class="pat-name-lg">Arjun Nair</div>
+            <div class="pat-info">Age: 52 | Stroke | ICU Ward 2</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn-primary" onclick="switchPatient(3);showPage('dashboard')">Open Dashboard</button>
+            <button class="btn-secondary" onclick="switchPatient(3);showPage('patient-view')">Patient View</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: PATIENT VIEW ══ -->
+    <div id="page-patient-view" class="page">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Patient Communication Board</h1>
+          <p class="page-sub">Large buttons for easy communication</p>
+        </div>
+        <button class="btn-primary" onclick="showPage('dashboard')">← Back</button>
+      </header>
+      <div class="aac-display">
+        <div class="aac-word" id="aac-word">—</div>
+        <div class="aac-sub" id="aac-conf">Waiting for signal...</div>
+        <button class="aac-speak-btn" onclick="speakWord()">🔊 SPEAK</button>
+      </div>
+      <div class="aac-grid">
+        <button class="aac-btn aac-yes"    onclick="manualSelect('Yes')">✓ YES</button>
+        <button class="aac-btn aac-no"     onclick="manualSelect('No')">✗ NO</button>
+        <button class="aac-btn aac-help"   onclick="manualSelect('Help')">🆘 HELP</button>
+        <button class="aac-btn aac-pain"   onclick="manualSelect('Pain')">😣 PAIN</button>
+        <button class="aac-btn aac-water"  onclick="manualSelect('Water')">💧 WATER</button>
+        <button class="aac-btn aac-toilet" onclick="manualSelect('Toilet')">🚻 TOILET</button>
+        <button class="aac-btn aac-doctor" onclick="manualSelect('Doctor')">👨‍⚕️ DOCTOR</button>
+        <button class="aac-btn aac-family" onclick="manualSelect('Family')">👨‍👩‍👧 FAMILY</button>
+      </div>
+      <div class="panel" style="margin-top:18px">
+        <h2 class="panel-title">Auto Decode Controls</h2>
+        <div style="display:flex;gap:10px">
+          <button class="btn-primary" onclick="decodeSignal()">⚡ Decode Now</button>
+          <button class="btn-simulator" id="aac-sim-btn" onclick="startLiveSimulator()">
+            ▶ Start Auto Decode
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: ANALYTICS ══ -->
+    <div id="page-analytics" class="page">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Analytics & Reports</h1>
+          <p class="page-sub">Session statistics and model performance</p>
+        </div>
+      </header>
+      <div class="panels">
+        <div class="panel">
+          <h2 class="panel-title">Model Information</h2>
+          <div class="info-row"><span>Architecture</span><strong>EEGNet</strong></div>
+          <div class="info-row"><span>Classes</span><strong>8 words</strong></div>
+          <div class="info-row"><span>Input shape</span><strong>64ch × 256 samples</strong></div>
+          <div class="info-row"><span>Parameters</span><strong>3,240</strong></div>
+          <div class="info-row"><span>Framework</span><strong>TensorFlow 2.15</strong></div>
+          <div class="info-row"><span>Backend</span><strong>FastAPI + SQLite</strong></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">Session Summary</h2>
+          <div class="info-row"><span>Total decoded</span><strong id="an-total">0</strong></div>
+          <div class="info-row"><span>Avg confidence</span><strong id="an-conf">—</strong></div>
+          <div class="info-row"><span>Most frequent</span><strong id="an-freq">—</strong></div>
+          <div class="info-row"><span>Active patient</span><strong id="an-patient">Ramesh Kumar</strong></div>
+          <button class="btn-primary full-width" style="margin-top:14px"
+                  onclick="refreshAnalytics()">Refresh Stats</button>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">Word Frequency Chart</h2>
+          <div id="freq-chart"><p class="empty-msg">Start decoding to see frequencies.</p></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">System Status</h2>
+          <div class="info-row"><span>API Server</span><strong id="api-status">Checking...</strong></div>
+          <div class="info-row"><span>Model</span><strong style="color:#22c55e">Loaded ✅</strong></div>
+          <div class="info-row"><span>Database</span><strong style="color:#22c55e">SQLite ✅</strong></div>
+          <div class="info-row"><span>TTS Engine</span><strong style="color:#22c55e">Browser API ✅</strong></div>
+          <button class="btn-secondary full-width" style="margin-top:14px"
+                  onclick="checkApiStatus()">Check API Status</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: ABOUT ══ -->
+    <div id="page-about" class="page">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">About NeuroVoice</h1>
+          <p class="page-sub">Deep Learning Based Brain-Computer Interface System</p>
+        </div>
+      </header>
+      <div class="panel" style="max-width:700px">
+        <h2 class="panel-title">Project Overview</h2>
+        <p style="font-size:14px;line-height:1.7;color:#475569;margin-bottom:16px">
+          NeuroVoice is a web-based Brain-Computer Interface system for recognition
+          of covert speech to augment communication for paralyzed patients. It uses
+          EEGNet deep learning model to decode imagined words in real time.
+        </p>
+        <div class="info-row"><span>Model</span><strong>EEGNet (CNN-based)</strong></div>
+        <div class="info-row"><span>Signal type</span><strong>EEG + fNIRS (hybrid)</strong></div>
+        <div class="info-row"><span>Classes</span><strong>Yes, No, Help, Pain, Water, Toilet, Doctor, Family</strong></div>
+        <div class="info-row"><span>Languages</span><strong>English, Hindi, Marathi TTS</strong></div>
+        <div class="info-row"><span>Stack</span><strong>Python · TensorFlow · FastAPI · SQLite · HTML/CSS/JS</strong></div>
+        <div class="info-row"><span>Developer</span><strong>M.Tech Project — 2026</strong></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const API   = 'http://localhost:8000';
+const WORDS = ['Yes','No','Help','Pain','Water','Toilet','Doctor','Family'];
+const HINDI = {
+  Yes:'हाँ', No:'नहीं', Help:'मदद करो', Pain:'दर्द है',
+  Water:'पानी', Toilet:'शौचालय', Doctor:'डॉक्टर', Family:'परिवार'
+};
+const MARATHI = {
+  Yes:'होय', No:'नाही', Help:'मदत करा', Pain:'वेदना आहे',
+  Water:'पाणी', Toilet:'शौचालय', Doctor:'डॉक्टर', Family:'कुटुंब'
+};
+const PAT_NAMES = {
+  1:{name:'Ramesh Kumar', initials:'RK', condition:'ALS',        ward:'ICU Ward 3'},
+  2:{name:'Sunita Patil', initials:'SP', condition:'Locked-in',  ward:'Neuro Ward 1'},
+  3:{name:'Arjun Nair',   initials:'AN', condition:'Stroke',     ward:'ICU Ward 2'}
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+let sessionId        = null;
+let patientId        = 1;
+let sessionTimer     = null;
+let sessionSeconds   = 0;
+let lastWord         = '';
+let history          = [];
+let simulatorInterval = null;
+let helpCount        = 0;
+let wordFreq         = {};
+let timeline         = [];
+let animFrame, eegOffset = 0;
+
+// ── Page navigation ────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+// ── Word grid ──────────────────────────────────────────────────────────────
+function buildWordGrid(activeWord) {
+  document.getElementById('word-grid').innerHTML = WORDS.map(w =>
+    `<div class="word-chip ${w===activeWord?'active':''}"
+          onclick="manualSelect('${w}')">${w}</div>`
+  ).join('');
+}
+buildWordGrid('');
+
+// ── START SESSION ──────────────────────────────────────────────────────────
+async function startSession() {
+  if (sessionId) {
+    alert('Session already active! Click Stop Session first.');
+    return;
+  }
+
+  const btn = document.getElementById('session-btn');
+  btn.textContent      = 'Starting...';
+  btn.style.background = '#f59e0b';
+  btn.disabled         = true;
+
+  try {
+    const res = await fetch(`${API}/sessions/start/${patientId}`, {
+      method: 'POST'
+    });
+
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+    const data     = await res.json();
+    sessionId      = data.session_id;
+    sessionSeconds = 0;
+    helpCount      = 0;
+
+    clearInterval(sessionTimer);
+    sessionTimer = setInterval(() => {
+      sessionSeconds++;
+      const m  = String(Math.floor(sessionSeconds / 60)).padStart(2, '0');
+      const s  = String(sessionSeconds % 60).padStart(2, '0');
+      const el = document.getElementById('session-time');
+      if (el) el.textContent = `${m}:${s}`;
+    }, 1000);
+
+    btn.textContent      = '✅ Active';
+    btn.style.background = '#16a34a';
+    btn.disabled         = false;
+
+    document.getElementById('stop-btn').style.display      = 'inline-block';
+    document.getElementById('status-dot').style.background = '#22c55e';
+    document.getElementById('status-text').textContent     = 'Session active';
+
+    startEEGAnimation();
+    console.log('✅ Session started:', sessionId);
+
+  } catch(e) {
+    console.error('❌ Session error:', e);
+    btn.textContent      = 'Start Session';
+    btn.style.background = '#3b82f6';
+    btn.disabled         = false;
+    sessionId            = null;
+    alert('❌ Cannot connect!\n\nMake sure backend is running:\ncd backend\n..\\venv\\Scripts\\python.exe -m uvicorn main:app --port 8000');
+  }
+}
+
+// ── STOP SESSION ───────────────────────────────────────────────────────────
+async function stopSession() {
+  if (!sessionId) return;
+
+  try {
+    await fetch(`${API}/sessions/end/${sessionId}`, { method: 'POST' });
+  } catch(e) {
+    console.error('Stop error:', e);
+  }
+
+  clearInterval(sessionTimer);
+  sessionTimer   = null;
+  sessionId      = null;
+  sessionSeconds = 0;
+
+  document.getElementById('session-time').textContent     = '00:00';
+  document.getElementById('session-btn').textContent      = 'Start Session';
+  document.getElementById('session-btn').style.background = '#3b82f6';
+  document.getElementById('stop-btn').style.display       = 'none';
+  document.getElementById('status-dot').style.background  = '#94a3b8';
+  document.getElementById('status-text').textContent      = 'No session active';
+
+  if (simulatorInterval) {
+    clearInterval(simulatorInterval);
+    simulatorInterval = null;
+    const sb = document.getElementById('sim-btn');
+    if (sb) { sb.textContent = '▶ Start Live Simulator'; sb.style.background = '#7c3aed'; }
+    const ab = document.getElementById('aac-sim-btn');
+    if (ab) { ab.textContent = '▶ Start Auto Decode'; }
+  }
+
+  alert('✅ Session stopped and saved.');
+}
+
+// ── DECODE SIGNAL ──────────────────────────────────────────────────────────
+async function decodeSignal() {
+  if (!sessionId) {
+    await startSession();
+    await new Promise(r => setTimeout(r, 800));
+  }
+  if (!sessionId) {
+    alert('Session could not start. Is backend running?');
+    return;
+  }
+
+  const fileInput = document.getElementById('eeg-file');
+  const formData  = new FormData();
+
+  if (fileInput.files.length > 0) {
+    formData.append('file', fileInput.files[0]);
+  } else {
+    const blob = new Blob([new Float32Array(64 * 256)],
+                          { type: 'application/octet-stream' });
+    formData.append('file', blob, 'demo.npy');
+  }
+
+  document.getElementById('decoded-word').textContent = '...';
+
+  try {
+    const res = await fetch(
+      `${API}/predict?session_id=${sessionId}&patient_id=${patientId}`,
+      { method: 'POST', body: formData }
+    );
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const data = await res.json();
+    if (data && data.word) {
+      displayResult(data);
+      addToHistory(data);
+      loadStats();
+      checkEmergency(data.word);
+    }
+  } catch(e) {
+    console.error('Decode error:', e);
+    document.getElementById('decoded-word').textContent = '—';
+    alert('Decode failed: ' + e.message);
+  }
+}
+
+// ── LIVE SIMULATOR ─────────────────────────────────────────────────────────
+async function startLiveSimulator() {
+  const btn    = document.getElementById('sim-btn');
+  const aacBtn = document.getElementById('aac-sim-btn');
+
+  if (simulatorInterval) {
+    clearInterval(simulatorInterval);
+    simulatorInterval = null;
+    if (btn)    { btn.textContent = '▶ Start Live Simulator'; btn.style.background = '#7c3aed'; }
+    if (aacBtn) { aacBtn.textContent = '▶ Start Auto Decode'; }
+    return;
+  }
+
+  if (!sessionId) {
+    await startSession();
+    await new Promise(r => setTimeout(r, 800));
+  }
+  if (!sessionId) {
+    alert('Session could not start. Is backend running?');
+    return;
+  }
+
+  if (btn)    { btn.textContent = '⏹ Stop Simulator'; btn.style.background = '#dc2626'; }
+  if (aacBtn) { aacBtn.textContent = '⏹ Stop'; }
+
+  simulatorInterval = setInterval(async () => {
+    if (!sessionId) {
+      clearInterval(simulatorInterval);
+      simulatorInterval = null;
+      return;
+    }
+    const blob = new Blob([new Float32Array(64 * 256)],
+                          { type: 'application/octet-stream' });
+    const fd   = new FormData();
+    fd.append('file', blob, 'live.npy');
+    try {
+      const res = await fetch(
+        `${API}/predict?session_id=${sessionId}&patient_id=${patientId}`,
+        { method: 'POST', body: fd }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.word) {
+        displayResult(data);
+        addToHistory(data);
+        loadStats();
+        checkEmergency(data.word);
+        speakWord();
+      }
+    } catch(e) { console.error('Simulator error:', e); }
+  }, 3000);
+}
+
+// ── DISPLAY RESULT ─────────────────────────────────────────────────────────
+function displayResult(data) {
+  if (!data || !data.word) return;
+  lastWord = data.word;
+
+  document.getElementById('decoded-word').textContent = data.word;
+  document.getElementById('conf-pct').textContent     = data.confidence + '%';
+  document.getElementById('conf-bar').style.width     = data.confidence + '%';
+  document.getElementById('aac-word').textContent     = data.word;
+  document.getElementById('aac-conf').textContent     = `Confidence: ${data.confidence}%`;
+
+  const warn = document.getElementById('threshold-warn');
+  if (warn) warn.style.display = data.confidence < 40 ? 'block' : 'none';
+
+  buildWordGrid(data.word);
+
+  if (data.all_probabilities && typeof data.all_probabilities === 'object') {
+    buildProbChart(data.all_probabilities);
+  }
+
+  updateTimeline(data.word);
+  wordFreq[data.word] = (wordFreq[data.word] || 0) + 1;
+  updateFreqChart();
+}
+
+// ── PROBABILITY CHART ──────────────────────────────────────────────────────
+function buildProbChart(probs) {
+  if (!probs || typeof probs !== 'object') return;
+  const values = Object.values(probs);
+  if (values.length === 0) return;
+  const max = Math.max(...values);
+  document.getElementById('prob-chart').innerHTML =
+    Object.entries(probs).map(([word, pct]) => `
+      <div class="prob-row">
+        <span class="prob-label">${word}</span>
+        <div class="prob-bar-bg">
+          <div class="prob-bar-fill ${pct===max?'top':''}"
+               style="width:${Math.max(pct,2)}%"></div>
+        </div>
+        <span class="prob-pct">${pct}%</span>
+      </div>`).join('');
+}
+
+// ── TIMELINE ───────────────────────────────────────────────────────────────
+function updateTimeline(word) {
+  timeline.push(word);
+  if (timeline.length > 6) timeline.shift();
+  document.getElementById('word-timeline').innerHTML =
+    timeline.map((w,i) =>
+      `<span class="timeline-chip ${i===timeline.length-1?'active':''}">${w}</span>`
+    ).join(' → ');
+}
+
+// ── FREQUENCY CHART ────────────────────────────────────────────────────────
+function updateFreqChart() {
+  const el = document.getElementById('freq-chart');
+  if (!el || Object.keys(wordFreq).length === 0) return;
+  const max = Math.max(...Object.values(wordFreq), 1);
+  el.innerHTML = Object.entries(wordFreq)
+    .sort((a,b) => b[1]-a[1])
+    .map(([w,c]) => `
+      <div class="prob-row">
+        <span class="prob-label">${w}</span>
+        <div class="prob-bar-bg">
+          <div class="prob-bar-fill top" style="width:${(c/max)*100}%"></div>
+        </div>
+        <span class="prob-pct">${c}x</span>
+      </div>`).join('');
+}
+
+// ── EMERGENCY ──────────────────────────────────────────────────────────────
+function checkEmergency(word) {
+  if (word === 'Help' || word === 'Pain') {
+    helpCount++;
+    if (helpCount >= 2) {
+      document.getElementById('alert-banner').style.display = 'flex';
+    }
+  } else {
+    helpCount = 0;
+  }
+}
+
+function dismissAlert() {
+  document.getElementById('alert-banner').style.display = 'none';
+  helpCount = 0;
+}
+
+// ── HISTORY ────────────────────────────────────────────────────────────────
+function addToHistory(data) {
+  history.unshift({...data, time: new Date().toLocaleTimeString()});
+  document.getElementById('history-list').innerHTML =
+    history.slice(0,15).map(h => `
+      <div class="history-item">
+        <span class="hist-word">${h.word}</span>
+        <span class="hist-conf">${h.confidence}%</span>
+        <span class="hist-time">${h.time}</span>
+      </div>`).join('');
+}
+
+function clearHistory() {
+  history = []; wordFreq = {}; timeline = [];
+  document.getElementById('history-list').innerHTML =
+    '<p class="empty-msg">History cleared.</p>';
+  document.getElementById('word-timeline').innerHTML =
+    '<span class="empty-msg" style="font-size:12px">No words yet</span>';
+  const fc = document.getElementById('freq-chart');
+  if (fc) fc.innerHTML = '<p class="empty-msg">No data yet.</p>';
+}
+
+function downloadHistory() {
+  if (!history.length) { alert('No history to download.'); return; }
+  const csv  = ['Word,Confidence,Time',
+    ...history.map(h => `${h.word},${h.confidence},${h.time}`)].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `neurovoice_patient${patientId}_${Date.now()}.csv`;
+  a.click();
+}
+
+// ── STATS ──────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const res  = await fetch(`${API}/stats/${patientId}`);
+    const data = await res.json();
+    document.getElementById('total-decoded').textContent =
+      data.total || 0;
+    document.getElementById('avg-conf').textContent =
+      data.avg_confidence ? data.avg_confidence + '%' : '—';
+    document.getElementById('most-freq').textContent =
+      data.most_frequent || '—';
+  } catch(e) { console.error('Stats error:', e); }
+}
+
+async function refreshAnalytics() {
+  try {
+    const res  = await fetch(`${API}/stats/${patientId}`);
+    const data = await res.json();
+    document.getElementById('an-total').textContent   = data.total || 0;
+    document.getElementById('an-conf').textContent    =
+      data.avg_confidence ? data.avg_confidence + '%' : '—';
+    document.getElementById('an-freq').textContent    = data.most_frequent || '—';
+    document.getElementById('an-patient').textContent = PAT_NAMES[patientId].name;
+  } catch(e) { console.error('Analytics error:', e); }
+}
+
+async function checkApiStatus() {
+  try {
+    await fetch(`${API}/`);
+    document.getElementById('api-status').textContent = 'Running ✅';
+    document.getElementById('api-status').style.color = '#22c55e';
+  } catch(e) {
+    document.getElementById('api-status').textContent = 'Offline ❌';
+    document.getElementById('api-status').style.color = '#ef4444';
+  }
+}
+
+// ── SWITCH PATIENT ─────────────────────────────────────────────────────────
+function switchPatient(id) {
+  patientId = parseInt(id);
+
+  clearInterval(sessionTimer);
+  sessionTimer   = null;
+  sessionId      = null;
+  sessionSeconds = 0;
+  history        = [];
+  lastWord       = '';
+  helpCount      = 0;
+  timeline       = [];
+
+  const p = PAT_NAMES[patientId];
+  if (!p) return;
+
+  document.getElementById('current-patient').textContent  = p.name;
+  document.getElementById('pat-initials').textContent     = p.initials;
+  document.getElementById('pat-name-display').textContent = p.name;
+  document.getElementById('pat-condition').textContent    = `${p.condition} — ${p.ward}`;
+  document.getElementById('decoded-word').textContent     = '—';
+  document.getElementById('aac-word').textContent         = '—';
+  document.getElementById('conf-pct').textContent         = '—';
+  document.getElementById('conf-bar').style.width         = '0%';
+  document.getElementById('session-time').textContent     = '00:00';
+  document.getElementById('session-btn').textContent      = 'Start Session';
+  document.getElementById('session-btn').style.background = '#3b82f6';
+  document.getElementById('session-btn').disabled         = false;
+  document.getElementById('stop-btn').style.display       = 'none';
+  document.getElementById('status-dot').style.background  = '#94a3b8';
+  document.getElementById('status-text').textContent      = 'No session active';
+  document.getElementById('history-list').innerHTML       =
+    '<p class="empty-msg">No messages yet.</p>';
+  document.getElementById('prob-chart').innerHTML         =
+    '<p class="empty-msg">Decode a signal to see probabilities.</p>';
+  document.getElementById('word-timeline').innerHTML      =
+    '<span class="empty-msg" style="font-size:12px">No words yet</span>';
+
+  buildWordGrid('');
+  loadStats();
+}
+
+// ── MANUAL SELECT ──────────────────────────────────────────────────────────
+function manualSelect(word) {
+  lastWord = word;
+  document.getElementById('decoded-word').textContent = word;
+  document.getElementById('aac-word').textContent     = word;
+  document.getElementById('conf-pct').textContent     = 'Manual';
+  buildWordGrid(word);
+  speakWord();
+}
+
+// ── TTS ────────────────────────────────────────────────────────────────────
+function speakWord() {
+  if (!lastWord) return;
+  const utt  = new SpeechSynthesisUtterance(lastWord);
+  utt.lang   = 'en-IN';
+  utt.rate   = 0.85;
+  utt.volume = 1;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utt);
+}
+
+function speakHindi() {
+  if (!lastWord) return;
+  const utt = new SpeechSynthesisUtterance(HINDI[lastWord] || lastWord);
+  utt.lang  = 'hi-IN';
+  utt.rate  = 0.85;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utt);
+}
+
+function speakMarathi() {
+  if (!lastWord) return;
+  const text   = MARATHI[lastWord] || lastWord;
+  const utt    = new SpeechSynthesisUtterance(text);
+  const voices = speechSynthesis.getVoices();
+  const mr     = voices.find(v => v.lang === 'mr-IN');
+  const hi     = voices.find(v => v.lang === 'hi-IN');
+  utt.voice    = mr || hi || null;
+  utt.lang     = mr ? 'mr-IN' : 'hi-IN';
+  utt.rate     = 0.85;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utt);
+}
+
+// ── ADD PATIENT ────────────────────────────────────────────────────────────
+function showAddPatient() {
+  document.getElementById('add-patient-form').style.display = 'block';
+}
+
+async function addPatient() {
+  const name      = document.getElementById('p-name').value.trim();
+  const age       = document.getElementById('p-age').value;
+  const condition = document.getElementById('p-condition').value;
+  const ward      = document.getElementById('p-ward').value.trim();
+  if (!name || !age || !ward) { alert('Please fill all fields'); return; }
+  try {
+    const res  = await fetch(
+      `${API}/patients?name=${encodeURIComponent(name)}&age=${age}&condition=${encodeURIComponent(condition)}&ward=${encodeURIComponent(ward)}`,
+      { method: 'POST' }
+    );
+    const data = await res.json();
+    alert(`✅ Patient ${data.name} added!`);
+    document.getElementById('add-patient-form').style.display = 'none';
+  } catch(e) { alert('Error: Is backend running?'); }
+}
+
+// ── EEG ANIMATION ─────────────────────────────────────────────────────────
+function startEEGAnimation() {
+  const canvas = document.getElementById('eeg-canvas');
+  if (!canvas) return;
+  const ctx    = canvas.getContext('2d');
+  const colors = ['#3b82f6','#8b5cf6','#06b6d4','#f59e0b'];
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    colors.forEach((color, ci) => {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = 1.2;
+      ctx.globalAlpha = 0.8;
+      for (let x = 0; x < canvas.width; x++) {
+        const y = 10 + ci * 18 +
+          Math.sin((x + eegOffset) * 0.05 + ci) * 6 +
+          Math.sin((x + eegOffset) * 0.13 + ci * 2) * 3;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
+    eegOffset += 2;
+    animFrame = requestAnimationFrame(draw);
+  }
+
+  if (animFrame) cancelAnimationFrame(animFrame);
+  draw();
+}
+
+// ── FILE HANDLE ────────────────────────────────────────────────────────────
+function handleFile(input) {
+  if (input.files.length > 0) {
+    document.getElementById('upload-label').textContent = '📁 ' + input.files[0].name;
+    document.getElementById('upload-area').style.borderColor = '#3b82f6';
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+loadStats();
+checkApiStatus();
+startEEGAnimation();
+</script>
+</body>
+</html>
