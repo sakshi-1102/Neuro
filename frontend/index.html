@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NeuroVoice — BCI Communication System</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<meta name="theme-color" content="#1a0533">
 <link rel="stylesheet" href="style.css">
+
 </head>
 <body>
 <div class="app">
@@ -405,7 +409,7 @@ const PAT_NAMES = {
 
 // ── State ──────────────────────────────────────────────────────────────────
 let sessionId        = null;
-let patientId        = 1;
+let patientId        = 0;
 let sessionTimer     = null;
 let sessionSeconds   = 0;
 let lastWord         = '';
@@ -433,6 +437,60 @@ function buildWordGrid(activeWord) {
 buildWordGrid('');
 
 // ── START SESSION ──────────────────────────────────────────────────────────
+// async function startSession() {
+//   if (sessionId) {
+//     alert('Session already active! Click Stop Session first.');
+//     return;
+//   }
+
+//   const btn = document.getElementById('session-btn');
+//   btn.textContent      = 'Starting...';
+//   btn.style.background = '#f59e0b';
+//   btn.disabled         = true;
+
+//   try {
+//     const res = await fetch(`${API}/sessions/start/${patientId}`, {
+//       method: 'POST'
+//     });
+
+//     if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+//     const data     = await res.json();
+//     sessionId      = data.session_id;
+//     sessionSeconds = 0;
+//     helpCount      = 0;
+
+//     clearInterval(sessionTimer);
+//     sessionTimer = setInterval(() => {
+//       sessionSeconds++;
+//       const m  = String(Math.floor(sessionSeconds / 60)).padStart(2, '0');
+//       const s  = String(sessionSeconds % 60).padStart(2, '0');
+//       const el = document.getElementById('session-time');
+//       if (el) el.textContent = `${m}:${s}`;
+//     }, 1000);
+
+//     btn.textContent      = '✅ Active';
+//     btn.style.background = '#16a34a';
+//     btn.disabled         = false;
+
+//     document.getElementById('stop-btn').style.display      = 'inline-block';
+//     document.getElementById('status-dot').style.background = '#22c55e';
+//     document.getElementById('status-text').textContent     = 'Session active';
+
+//     startEEGAnimation();
+//     console.log('✅ Session started:', sessionId);
+
+//   } catch(e) {
+//     console.error('❌ Session error:', e);
+//     btn.textContent      = 'Start Session';
+//     btn.style.background = '#3b82f6';
+//     btn.disabled         = false;
+//     sessionId            = null;
+//     alert('❌ Cannot connect!\n\nMake sure backend is running:\ncd backend\n..\\venv\\Scripts\\python.exe -m uvicorn main:app --port 8000');
+//   }
+// }
+
+
 async function startSession() {
   if (sessionId) {
     alert('Session already active! Click Stop Session first.');
@@ -444,10 +502,16 @@ async function startSession() {
   btn.style.background = '#f59e0b';
   btn.disabled         = true;
 
+  // Add 10 second timeout
+  const controller = new AbortController();
+  const timeout    = setTimeout(() => controller.abort(), 10000);
+
   try {
     const res = await fetch(`${API}/sessions/start/${patientId}`, {
-      method: 'POST'
+      method: 'POST',
+      signal: controller.signal
     });
+    clearTimeout(timeout);
 
     if (!res.ok) throw new Error(`Server error: ${res.status}`);
 
@@ -477,12 +541,18 @@ async function startSession() {
     console.log('✅ Session started:', sessionId);
 
   } catch(e) {
-    console.error('❌ Session error:', e);
+    clearTimeout(timeout);
     btn.textContent      = 'Start Session';
     btn.style.background = '#3b82f6';
     btn.disabled         = false;
     sessionId            = null;
-    alert('❌ Cannot connect!\n\nMake sure backend is running:\ncd backend\n..\\venv\\Scripts\\python.exe -m uvicorn main:app --port 8000');
+
+    if (e.name === 'AbortError') {
+      alert('❌ Request timed out!\n\nBackend is taking too long.\nTry clicking Start Session again.');
+    } else {
+      alert('❌ Cannot connect!\n\nMake sure backend is running:\ncd backend\n..\\venv\\Scripts\\python.exe -m uvicorn main:app --port 8000');
+    }
+    console.error('Session error:', e);
   }
 }
 
@@ -776,7 +846,12 @@ async function checkApiStatus() {
 
 // ── SWITCH PATIENT ─────────────────────────────────────────────────────────
 function switchPatient(id) {
-  patientId = parseInt(id);
+  const newId = parseInt(id);
+
+  // PROTECTION: Don't reset if same patient and session is active
+  if (newId === patientId && sessionId) return;
+
+  patientId = newId;
 
   clearInterval(sessionTimer);
   sessionTimer   = null;
@@ -921,9 +996,17 @@ function handleFile(input) {
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────
-loadStats();
-checkApiStatus();
-startEEGAnimation();
+
+document.addEventListener('DOMContentLoaded', async function() {
+  buildWordGrid('');
+  startEEGAnimation();
+  await loadStats();
+  await checkApiStatus();
+  console.log('✅ NeuroVoice initialized');
+});
+
+
+
 </script>
 </body>
 </html>

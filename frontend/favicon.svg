@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="32" fill="#1a0533"/>
+  
+  <!-- Brain shape -->
+  <g fill="none" stroke="#7c85f7" stroke-width="2" stroke-linecap="round">
+    <!-- Left brain -->
+    <path d="M20 28 C16 24 14 18 18 14 C22 10 28 12 30 16"/>
+    <path d="M18 14 C15 10 17 6 21 6 C25 6 27 9 26 13"/>
+    <path d="M20 28 C16 30 14 36 18 40 C20 42 24 42 26 40"/>
+    <path d="M18 40 C16 44 18 48 22 48 C26 48 28 45 26 42"/>
+    
+    <!-- Right brain -->
+    <path d="M44 28 C48 24 50 18 46 14 C42 10 36 12 34 16"/>
+    <path d="M46 14 C49 10 47 6 43 6 C39 6 37 9 38 13"/>
+    <path d="M44 28 C48 30 50 36 46 40 C44 42 40 42 38 40"/>
+    <path d="M46 40 C48 44 46 48 42 48 C38 48 36 45 38 42"/>
+    
+    <!-- Center line -->
+    <line x1="32" y1="8" x2="32" y2="48" stroke="#7c85f7" stroke-width="1.5" stroke-dasharray="3,2"/>
+    
+    <!-- Brain connectors -->
+    <path d="M26 20 C29 18 33 18 38 20" stroke="#a78bfa" stroke-width="1.5"/>
+    <path d="M25 30 C29 28 35 28 39 30" stroke="#a78bfa" stroke-width="1.5"/>
+    <path d="M26 40 C29 42 35 42 38 40" stroke="#a78bfa" stroke-width="1.5"/>
+  </g>
+  
+  <!-- EEG wave at bottom -->
+  <polyline points="8,54 14,54 17,50 20,58 23,54 26,54 29,51 32,57 35,54 38,54 41,50 44,58 47,54 50,54 56,54"
+            fill="none" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
